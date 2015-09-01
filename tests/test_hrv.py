@@ -120,3 +120,61 @@ class TestFrequencyDomain(unittest.TestCase):
         fs = "-23"
         self.assertRaises(ValueError, hrv.FrequencyDomain, RRI, fs)
 
+    def test_calculate(self):
+        hrv_obj = hrv.FrequencyDomain(RRI)
+        segment = 256
+        overlap = 128
+        hrv_obj.calculate(segment, overlap)
+
+    def test_calculate_arguments(self):
+        hrv_obj = hrv.FrequencyDomain(RRI)
+        segment = "256"
+        overlap = 128
+        self.assertRaises(ValueError, hrv_obj.calculate, segment, overlap)
+        segment = 256
+        overlap = "128"
+        self.assertRaises(ValueError, hrv_obj.calculate, segment, overlap)
+        segment = [256, ]
+        overlap = 128
+        self.assertRaises(ValueError, hrv_obj.calculate, segment, overlap)
+
+    def test_interp(self):
+        #Values calculated with Matlab
+        time_interp = [float(t.split("\t")[0]) for t in
+                open("tests/time_interp.txt")]
+        rri_interp = [float(t.split("\t")[1]) for t in
+                open("tests/time_interp.txt")]
+        hrv_obj = hrv.FrequencyDomain(RRI)
+        segment = 256
+        overlap = 128
+        hrv_obj.calculate(segment, overlap)
+        np.testing.assert_array_almost_equal(time_interp,
+                hrv_obj.rri_time_interp, decimal=3)
+        np.testing.assert_array_almost_equal(rri_interp,
+                hrv_obj.rri_interp, decimal=3)
+
+    def test_spectrum(self):
+        #Values calculated with Matlab
+        fxx = [float(t.split("\t")[0]) for t in
+                open("tests/test_spectrum.txt")]
+        pxx = [float(t.split("\t")[1]) for t in
+                open("tests/test_spectrum.txt")]
+        hrv_obj = hrv.FrequencyDomain(RRI)
+        segment = 256
+        overlap = 128
+        hrv_obj.calculate(segment, overlap)
+        np.testing.assert_array_almost_equal(hrv_obj.fxx,
+                fxx, decimal=3)
+        #np.testing.assert_array_almost_equal(hrv_obj.pxx,
+        #        pxx, decimal=3)
+    def test_indexes(self):
+        hrv_obj = hrv.FrequencyDomain(RRI)
+        segment = 256
+        overlap = 128
+        hrv_obj.calculate(segment, overlap)
+        self.assertEqual(
+
+
+
+
+
