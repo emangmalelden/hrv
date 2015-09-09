@@ -4,6 +4,77 @@ from scipy import signal, interpolate
 
 from hrvmetaclass import MetaModel, Signal, Positive
 
+def time_domain(rri):
+    """
+    Calculates the classical Heart Heart Variability Time Domain indices.
+    """
+    #TODO: Explain more the indices.
+    rri = _validate_rri(rri)
+    rmssd = np.sqrt(np.sum(np.diff(rri) ** 2) / len(np.diff(rri)))
+    sdnn = np.std(rri, ddof=1)
+    pnn50 = np.sum(np.diff(rri) > 50) / float(len(np.diff(rri))) * 100
+    mrri = np.mean(rri)
+    hr = 60 / (rri / 1000.0)
+    mhr = np.mean(hr)
+
+    return rmssd, sdnn, pnn50, mrri, mhr
+
+def time_varying(rri, seg=30, overl=0):
+    time = _create_time_array(rri)
+    shift = seg - overl
+    n_segments = int((time[-1] - seg) / shift) + 1 #Number of sucessive segments.
+    start = 0
+    stop = seg
+    rri = _validate_rri(rri)
+    rmssd = [];sdnn = [];pnn50 = [];mrri = []; mhr = []
+    for segment in xrange(n_segments):
+        rri_seg = rri[np.logical_and(time >= start, time <= stop)]
+        r, s, p, mr, mh = time_domain(rri_seg)
+        rmssd.append(r)
+        sdnn.append(s)
+        pnn50.append(p)
+        mrri.append(mr)
+        mhr.append(mh)
+        start += shift
+        stop += shift
+    return rmssd, sdnn, pnn50, mrri, mhr
+
+def _create_time_array(rri):
+    """
+    Create a time array based on the RRi array
+    """
+    if _is_milisecond:
+        rri_time =  np.cumsum(rri) / 1000.0 #Convert to second
+    else:
+        rri_time = np.cumsum(rri)
+
+    return rri_time - rri_time[0] #Remove the offset.
+
+def _is_milisecond(rri):
+    """
+    Check if the rri is in miliseconds.
+    """
+    rri_mean = np.mean(rri)
+    return rri_mean > 50.0 #Arbitrary value
+
+def _validate_rri(rri):
+    """
+    Check if RRi is a list with float/integer or numpy array.
+    """
+    if isinstance(rri, list):
+        #If is a list check if every element is an integer or float.
+        if not all([isinstance(rri_value, int) or isinstance(rri_value, float)
+            for rri_value in rri]):
+            raise ValueError("rri must be a list of float/integer or a numpy array")
+        if not _is_milisecond(rri):
+            rri = [rri * 1000.0 for rri in rri]
+        return np.array(rri)
+
+    elif isinstance(rri, np.ndarray):
+        if not _is_milisecond(rri):
+            rri *= 1000.0
+        return np.array(rri)
+
 class TimeDomain(MetaModel):
 
     rri = Signal()

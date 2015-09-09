@@ -4,177 +4,72 @@ import numpy as np
 
 from hrv import hrv
 
-RRI = [float(val.strip()) for val in open("tests/test_data.txt")
-        if val]
-class TestTimeDomain(unittest.TestCase):
+class TestCaseRRiSignal(unittest.TestCase):
 
-    def test_class(self):
-        rri = [1, 2, 4, 5, 6, 7]
-        hrv_obj = hrv.TimeDomain(rri)
+    rri = [float(rri.strip()) for rri in open('tests/test_rri.txt') if
+            rri.strip()]
 
-    def test_rri_type(self):
-        rri = 1.0
-        self.assertRaises(ValueError, hrv.TimeDomain, rri)
-        rri = "1034.3"
-        self.assertRaises(ValueError, hrv.TimeDomain, rri)
-        rri = ["123", "123", "233"]
-        self.assertRaises(ValueError, hrv.TimeDomain, rri)
-        rri = [2.034, 0.23, "12"]
-        self.assertRaises(ValueError, hrv.TimeDomain, rri)
+    def test_rri_isin_miliseconds(self):
+        self.assertTrue(hrv._is_milisecond(self.rri))
+        rri_insecond = [rri / 1000.0 for rri in self.rri]
+        #TODO:Test not passing with array_equal and the array is visualy equal.
+        np.testing.assert_almost_equal(self.rri, hrv._validate_rri(rri_insecond),
+                decimal=10)
+        rri_insecond = np.array(rri_insecond)
+        np.testing.assert_almost_equal(np.array(self.rri),
+                hrv._validate_rri(rri_insecond), decimal=10)
 
-    def test_is_rri_second(self):
-        #Read the Test RRi
-        rri = [float(val.strip()) for val in open("tests/test_data.txt")
-                if val]
-        rri_seconds = [val / 1000.0 for val in rri]
+    def test_rri_validation(self):
+        string_rri = ["12", "343", "124"]
+        with self.assertRaises(ValueError):
+            hrv._validate_rri(string_rri)
 
-        hrv_obj = hrv.TimeDomain(rri)
-        self.assertFalse(hrv_obj._is_insecond())
+    def test_time_creation(self):
+       rri_time = np.cumsum(self.rri) / 1000.0 #Convert to seconds.
+       rri_time -= rri_time[0] #Remove the offset
+       np.testing.assert_array_equal(rri_time, hrv._create_time_array(self.rri))
 
-        hrv_obj_sec = hrv.TimeDomain(rri_seconds)
-        self.assertTrue(hrv_obj_sec._is_insecond())
+    def test_rri_argument(self):
+        hrv.time_domain(self.rri)
 
-    def test_indexes(self):
-        hrv_obj = hrv.TimeDomain(RRI)
-        hrv_obj.calculate()
-        #Indexes calculated with Matlab
-        sdnn = 49.717616
-        rmssd = 32.58895
-        pnn50 = 11.14341
-        rrimean = 877.86240
-        hrmean = 68.56949
+class TestCaseTimeDomain(unittest.TestCase):
 
-        self.assertAlmostEqual(hrv_obj.sdnn, sdnn, places=3)
-        self.assertAlmostEqual(hrv_obj.rmssd, rmssd, places=3)
-        self.assertAlmostEqual(hrv_obj.pnn50, pnn50, places=3)
-        self.assertAlmostEqual(hrv_obj.rri_mean, rrimean, places=3)
-        self.assertAlmostEqual(hrv_obj.hr_mean, hrmean, places=3)
+    rri = [float(rri.strip()) for rri in open('tests/test_rri.txt') if
+            rri.strip()]
 
-class TestTimeVarying(unittest.TestCase):
+    def test_time_domain_results(self):
+        #Results calculated with Matlab
+        rmssd = 32.5890
+        sdnn = 49.7176
+        pnn50 = 6.1106
+        mrri = 877.8624
+        mhr = 68.5695
+        results = (rmssd, sdnn, pnn50, mrri, mhr)
+        np.testing.assert_almost_equal(results, hrv.time_domain(self.rri),
+                decimal=4)
 
-    def test_class(self):
-        segment = 30
-        overlap = 0
-        hrv_obj = hrv.TimeVarying(RRI, segment, overlap)
+class TestCaseTimeVarying(unittest.TestCase):
 
-    def test_signal_encapsulation(self):
-        rri = 1
-        segment = 30
-        overlap = 0
-        self.assertRaises(ValueError, hrv.TimeVarying, rri, segment, overlap)
+    rri = [float(rri.strip()) for rri in open('tests/test_rri.txt') if
+            rri.strip()]
 
-    def test_segment_overlap(self):
-        segment = "-30"
-        overlap = 0
-        self.assertRaises(ValueError, hrv.TimeVarying, RRI, segment, overlap)
-        segment = -23
-        overlap = 0
-        self.assertRaises(ValueError, hrv.TimeVarying, RRI, segment, overlap)
+    rmssd = [float(value.split("\t")[1].strip()) for value in
+            open("tests/time_varying_results.txt")]
+    sdnn = [float(value.split("\t")[0].strip()) for value in
+            open("tests/time_varying_results.txt")]
+    mrri = [float(value.split("\t")[3].strip()) for value in
+            open("tests/time_varying_results.txt")]
+    mhr = [float(value.split("\t")[4].strip()) for value in
+            open("tests/time_varying_results.txt")]
+    pnn50 = [float(value.strip()) for value in
+            open("tests/pnn50_varying.txt")]
 
-    def test_number_of_indexes(self):
-        segment = 30
-        overlap = 0
-        #value calculated with Matab
-        n_values = 30
-        hrv_obj = hrv.TimeVarying(RRI, segment, overlap)
-        self.assertEqual(hrv_obj.n_indexes, n_values)
+    def test_time_varying_results(self):
+        #Results calculated with Matlab
+        results = (self.rmssd, self.sdnn, self.pnn50, self.mrri, self.mhr)
+        np.testing.assert_almost_equal(hrv.time_varying(self.rri), results,
+                decimal=4)
 
-    def test_indexes(self):
-        segment = 30
-        overlap = 0
-        #value calculated with Matab
-        hrv_obj = hrv.TimeVarying(RRI, segment, overlap)
-        hrv_obj.calculate()
-        sdnni = []
-        rmssdi = []
-        pnn50i = []
-        rrimeani = []
-        hrmeani = []
-        for lines in open("tests/time_varying_results.txt", "r"):
-            sdnn, rmssd, pnn50, rrimean, hrmean = lines.split("\t")
-            sdnni.append(float(sdnn.strip()))
-            rmssdi.append(float(rmssd.strip()))
-            pnn50i.append(float(pnn50.strip()))
-            rrimeani.append(float(rrimean.strip()))
-            hrmeani.append(float(hrmean.strip()))
-        sdnni = np.array(sdnni)
-        rmssdi = np.array(rmssdi)
-        pnn50i = np.array(pnn50i)
-        rrimeani = np.array(rrimeani)
-        hrmeani = np.array(hrmeani)
-        np.testing.assert_array_almost_equal(hrv_obj.sdnn, sdnni, decimal=3)
-        np.testing.assert_array_almost_equal(hrv_obj.rmssd, rmssdi, decimal=3)
-        np.testing.assert_array_almost_equal(hrv_obj.pnn50, pnn50i, decimal=3)
-        np.testing.assert_array_almost_equal(hrv_obj.rri_mean, rrimeani, decimal=3)
-        np.testing.assert_array_almost_equal(hrv_obj.hr_mean, hrmeani, decimal=3)
-
-class TestFrequencyDomain(unittest.TestCase):
-    def test_class(self):
-        hrv_obj = hrv.FrequencyDomain(RRI)
-
-    def test_signal(self):
-        rri = 1
-        self.assertRaises(ValueError, hrv.FrequencyDomain, rri)
-
-    def test_arguments(self):
-        fs = "-23"
-        self.assertRaises(ValueError, hrv.FrequencyDomain, RRI, fs)
-
-    def test_calculate(self):
-        hrv_obj = hrv.FrequencyDomain(RRI)
-        segment = 256
-        overlap = 128
-        hrv_obj.calculate(segment, overlap)
-
-    def test_calculate_arguments(self):
-        hrv_obj = hrv.FrequencyDomain(RRI)
-        segment = "256"
-        overlap = 128
-        self.assertRaises(ValueError, hrv_obj.calculate, segment, overlap)
-        segment = 256
-        overlap = "128"
-        self.assertRaises(ValueError, hrv_obj.calculate, segment, overlap)
-        segment = [256, ]
-        overlap = 128
-        self.assertRaises(ValueError, hrv_obj.calculate, segment, overlap)
-
-    def test_interp(self):
-        #Values calculated with Matlab
-        time_interp = [float(t.split("\t")[0]) for t in
-                open("tests/time_interp.txt")]
-        rri_interp = [float(t.split("\t")[1]) for t in
-                open("tests/time_interp.txt")]
-        hrv_obj = hrv.FrequencyDomain(RRI)
-        segment = 256
-        overlap = 128
-        hrv_obj.calculate(segment, overlap)
-        np.testing.assert_array_almost_equal(time_interp,
-                hrv_obj.rri_time_interp, decimal=3)
-        np.testing.assert_array_almost_equal(rri_interp,
-                hrv_obj.rri_interp, decimal=3)
-
-    def test_spectrum(self):
-        #Values calculated with Matlab
-        fxx = [float(t.split("\t")[0]) for t in
-                open("tests/test_spectrum.txt")]
-        pxx = [float(t.split("\t")[1]) for t in
-                open("tests/test_spectrum.txt")]
-        hrv_obj = hrv.FrequencyDomain(RRI)
-        segment = 256
-        overlap = 128
-        hrv_obj.calculate(segment, overlap)
-        np.testing.assert_array_almost_equal(hrv_obj.fxx,
-                fxx, decimal=3)
-        #np.testing.assert_array_almost_equal(hrv_obj.pxx,
-        #        pxx, decimal=3)
-    def test_indexes(self):
-        hrv_obj = hrv.FrequencyDomain(RRI)
-        segment = 256
-        overlap = 128
-        hrv_obj.calculate(segment, overlap)
-        self.assertEqual(
-
-
-
+        self.assertEqual(len(results), len(hrv.time_varying(self.rri)))
 
 
