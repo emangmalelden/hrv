@@ -72,4 +72,20 @@ class TestCaseTimeVarying(unittest.TestCase):
 
         self.assertEqual(len(results), len(hrv.time_varying(self.rri)))
 
+class TestCaseFrequencyDomain(unittest.TestCase):
+
+    rri = [float(rri.strip()) for rri in open('tests/test_rri.txt') if
+            rri.strip()]
+
+    def test_intep_time_array(self):
+        time_interp = [float(value.split("\t")[0].strip()) for value in
+                open('tests/time_interp.txt') if value.strip()]
+        np.testing.assert_array_equal(time_interp,
+                hrv._create_time_interp_array(self.rri, 4.0))
+
+    def test_interp_rri_array(self):
+        rri_interp = [float(value.split("\t")[1].strip()) for value in
+                open("tests/time_interp.txt")]
+        np.testing.assert_almost_equal(rri_interp,
+                hrv._interpolate_rri(self.rri, 4.0), decimal=3)
 
