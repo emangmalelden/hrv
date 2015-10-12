@@ -21,16 +21,20 @@ def time_domain(rri):
 
 
 def time_varying(rri, seg=30, overl=0):
+    """
+    Calculates the classical Heart Rate Variability in Time Domain
+    """
     rri_time = _create_time_array(rri)
     shift = seg - overl
     n_segments = int((rri_time[-1] - seg) / shift) + 1 #Number of sucessive segments.
     start = 0
     stop = seg
     rri = _validate_rri(rri)
-    rmssd = [];sdnn = [];pnn50 = [];mrri = []; mhr = []
+    time_interval = [];rmssd = [];sdnn = [];pnn50 = [];mrri = []; mhr = [];
     for segment in xrange(n_segments):
         rri_seg = rri[np.logical_and(rri_time >= start, rri_time < stop)]
         r, s, p, mr, mh = time_domain(rri_seg)
+        time_interval.append(start)
         rmssd.append(r)
         sdnn.append(s)
         pnn50.append(p)
@@ -38,7 +42,7 @@ def time_varying(rri, seg=30, overl=0):
         mhr.append(mh)
         start += shift
         stop += shift
-    return rmssd, sdnn, pnn50, mrri, mhr
+    return time_interval, rmssd, sdnn, pnn50, mrri, mhr
 
 def frequency_domain(rri, resamp=4.0, method='welch', vlf=(0.003, 0.04),
         lf=(0.04, 0.15), hf=(0.15, 0.4), nperseg=256, noverlap=128):
@@ -47,7 +51,7 @@ def frequency_domain(rri, resamp=4.0, method='welch', vlf=(0.003, 0.04),
     if method == 'welch':
         fxx, pxx = signal.welch(rri_interp, fs=resamp, nperseg=nperseg,
                 noverlap=noverlap)
-        return _area_under_curve(fxx, pxx, vlf, lf, hf)
+        return [[fxx, pxx], _area_under_curve(fxx, pxx, vlf, lf, hf)]
     elif method == 'ar':
         #TODO: implement burg method
         pass
@@ -104,7 +108,7 @@ def _interpolate_rri(rri, resamp):
 
 def _create_time_interp_array(rri, resamp):
     rri_time = _create_time_array(rri)
-    rri_time_interp = np.arange(rri_time[0], rri_time[-1], 1 / resamp)
+    rri_time_interp = np.arange(rri_time[0], rri_time[-1], 1 / float(resamp))
     return rri_time_interp
 
 def _create_time_array(rri):
@@ -126,6 +130,8 @@ def _is_milisecond(rri):
     return rri_mean > 50.0 #Arbitrary value
 
 def _validate_rri(rri):
+    #TODO: Think more way to validate the rri - signal length pehaps,
+    #positive values
     """
     Check if RRi is a list with float/integer or numpy array.
     """
@@ -134,10 +140,61 @@ def _validate_rri(rri):
         if all([isinstance(rri_value, int) or isinstance(rri_value, float)
             for rri_value in rri]):
             if not _is_milisecond(rri):
-                rri = [rri * 1000.0 for rri in rri]
+                rri = map(lambda r: r * 1000, rri)
             return np.array(rri)
     elif isinstance(rri, np.ndarray):
         if not _is_milisecond(rri):
             rri *= 1000.0
         return np.array(rri)
+    elif isinstance(rri, basestring): #RRi as file path
+        rri = _open_rri(rri)
+        return rri
+    elif isinstance(rri, file):
+         if rri.name.endswith('.txt'):
+             rri = [float(value.strip()) for value in open(rri, "r") if
+                     value.strip()]
+             if not _is_milisecond(rri):
+                 map(lambda r: r * 1000, rri)
+             return np.array(rri)
+         elif rri.name.endswith(".hrm"):
+             rri = _load_from_hrm(rri)
+             return rri
     raise ValueError("rri must be a list of float/integer or a numpy array")
+
+def _open_rri(rri):
+    if isinstance(rri, basestring):
+        if rri.endswith(".txt"):
+            rri = [float(value.strip()) for value in open(rri, "r") if
+                    value.strip()]
+            if not _is_milisecond(rri):
+                rri = map(lambda r: r * 1000, rri)
+            return np.array(rri)
+        elif rri.endswith(".hrm"):
+            rri = _load_from_hrm(rri)
+            if not _is_milisecond(rri):
+                rri = map(lambda r: r * 1000, rri)
+            return rri
+
+    error_msg = "It was not possible to load {}"
+    if hasattr(rri, "name"):
+        error_msg = error_msg.format(rri.name)
+    else:
+        error_msg = error_msg.format(rri)
+    raise IOError(error_msg)
+
+def _load_from_hrm(file_path_or_file_object):
+    import re
+    #find the RRi values with regexp
+    if isinstance(file_path_or_file_object, basestring):
+        with open(file_path_or_file_object, "r") as file_obj:
+            file_content = file_obj.readlines()
+            file_content = ''.join(file_content)
+            rri = [float(value.strip()) for value in
+                    re.findall("\d{3,4}\\r\\n", file_content)]
+    else:
+            file_content = file_path_or_file_object.readlines()
+            file_content = ''.join(file_content)
+            rri = [float(value.strip()) for value in
+                    re.findall("\d{3,4}\\r\\n", file_content)]
+
+    return np.array(rri)

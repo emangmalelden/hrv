@@ -29,8 +29,9 @@ class TestCaseRRiSignal(unittest.TestCase):
        rri_time -= rri_time[0] #Remove the offset
        np.testing.assert_array_equal(rri_time, hrv._create_time_array(self.rri))
 
-    def test_rri_argument(self):
-        hrv.time_domain(self.rri)
+    def test_open_rri_string(self):
+        file_path = "tests/test_rri.txt"
+        np.testing.assert_array_equal(self.rri, hrv._validate_rri(file_path))
 
 class TestCaseTimeDomain(unittest.TestCase):
 
